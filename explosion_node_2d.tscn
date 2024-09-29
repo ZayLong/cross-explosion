@@ -1,0 +1,22 @@
+[gd_scene load_steps=4 format=3 uid="uid://b4j2ke2x4t4vj"]
+
+[ext_resource type="Texture2D" uid="uid://gcb7u3mw3xin" path="res://icon.svg" id="1_pvutv"]
+[ext_resource type="Script" path="res://explosion_node_2d.gd" id="1_vtc6r"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_fqfiq"]
+size = Vector2(64, 64)
+
+[node name="ExplosionNode2D" type="Node2D"]
+script = ExtResource("1_vtc6r")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+self_modulate = Color(1, 1, 0.05, 1)
+scale = Vector2(0.5, 0.5)
+texture = ExtResource("1_pvutv")
+
+[node name="Area2D" type="Area2D" parent="."]
+visible = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
+position = Vector2(32, 32)
+shape = SubResource("RectangleShape2D_fqfiq")
