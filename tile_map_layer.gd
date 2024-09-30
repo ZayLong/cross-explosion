@@ -1,6 +1,7 @@
 extends TileMapLayer
 
 signal move_response(_new_position:Vector2, _requester:Node2D)
+signal took_damage()
 enum ExplosionPattern {CROSS, SQUARE, DIAMOND, PATCH}
 
 @export var explosion_node:PackedScene
@@ -10,18 +11,20 @@ var grid_nodes:Dictionary
 var virtual_tile_map:Dictionary
 var explosion_interval:int = 3
 
+var astar_grid:AStarGrid2D = AStarGrid2D.new()
 
 func _ready() -> void:
 	for cell in self.get_used_cells():
 		virtual_tile_map[cell] = {
 			"grid_node": null,
 			"is_wall": get_cell_tile_data(cell).get_custom_data("is_wall"),
-			"explosion_interval": 3
+			"explosion_interval": explosion_interval
 		}
 	for child in get_children():
 		if child.is_in_group(&"GridNodes"):
 			child.move_request.connect(_on_move_request.bind(child))
 			var center_coord:Vector2i = self.local_to_map(child.position)
+			#if child.is_in_group(&"Enemies"): connect("took_damage")
 			if child.is_in_group(&"Player"): 
 				center_coord = starting_position
 				child.position = self.map_to_local(center_coord)
@@ -39,9 +42,12 @@ func _on_move_request(_direction:Vector2i, _node:Node2D):
 	
 	virtual_tile_map[new_center_coord] = virtual_tile_map[center_coord].duplicate()
 	virtual_tile_map[center_coord].grid_node = null
-	if _node.is_in_group("Player"):
-		_evaluate_explosion(new_center_coord)
+	#if _node.is_in_group("Player"):
+		#_evaluate_explosion(new_center_coord)
 	move_response.emit(self.map_to_local(new_center_coord), _node)
+	await _astar_grid_setup()
+	## Everyone has finished moving, now lets EXPLODE (maybe)
+	_evaluate_explosion(new_center_coord)
 
 
 func _evaluate_explosion(_center_coord:Vector2i, _pattern:ExplosionPattern = ExplosionPattern.SQUARE, _explosion_range:int = 3) -> void:
@@ -58,7 +64,7 @@ func _evaluate_explosion(_center_coord:Vector2i, _pattern:ExplosionPattern = Exp
 			if _pattern == ExplosionPattern.DIAMOND: if abs(r - ((_explosion_range - 1)/2)) + abs(c - ((_explosion_range - 1)/2)) > ((_explosion_range - 1)/2): continue ## this makes a diamond pattern!
 			_instance_explosion(cell)
 			_hurt_enemies(cell)
-	virtual_tile_map[_center_coord].explosion_interval = 3
+	virtual_tile_map[_center_coord].explosion_interval = explosion_interval
 
 
 func _hurt_enemies(cell) -> void:
@@ -72,15 +78,37 @@ func _instance_explosion(cell:Vector2i) -> void:
 	if explosion_node == null || explosion_node.can_instantiate() == false: return
 	var instance = explosion_node.instantiate()
 	instance.position = map_to_local(cell)
-	get_tree().root.add_child(instance)
+	add_child(instance)
 
 
-func _is_cell_empty() -> void:
-	pass
+## ENEMY MOVEMENT
+func _astar_grid_setup() -> void:
+	var tile_map:TileMapLayer = self
+	var cell_size = tile_map.tile_set.tile_size
+	var tile_map_rect:Rect2i = tile_map.get_used_rect()
+	
+	astar_grid.region = tile_map_rect
+	astar_grid.cell_size = cell_size
+	astar_grid.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_NEVER
+	if astar_grid.is_dirty(): astar_grid.update()
+	for cell in tile_map.get_used_cells():
+		var tile_data:TileData = tile_map.get_cell_tile_data(cell)
+		if tile_data.get_custom_data('is_wall') == true:
+			astar_grid.set_point_solid(cell, true)
+	 
+	for enemy in get_tree().get_nodes_in_group("Enemies"):
+		
+		var our_pos:Vector2i = tile_map.local_to_map(enemy.position)
+		var player_position:Vector2i = tile_map.local_to_map(get_tree().get_first_node_in_group("Player").position)
 
-
-func _on_gridnode_spawned() -> void:
-	pass
-
-func _on_gridnode_despawned() -> void:
-	pass
+		var movement_points = astar_grid.get_point_path(our_pos, player_position) 
+		if movement_points.size() > 1: enemy.global_position = movement_points[1]
+		var new_center_coord:Vector2i = local_to_map(enemy.position)
+		if virtual_tile_map.has(new_center_coord) == false: return
+		if virtual_tile_map[new_center_coord].grid_node != null: return
+		if virtual_tile_map[new_center_coord].is_wall: return
+		virtual_tile_map[new_center_coord] = virtual_tile_map[our_pos].duplicate()
+		virtual_tile_map[our_pos].grid_node = null
+	print("THAT")
+	#_evaluate_explosion()
+	#await _movement_tween()

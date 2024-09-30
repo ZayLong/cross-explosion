@@ -30,31 +30,7 @@ func _movement_tween() -> void:
 	await _t.finished
 
 
-func _is_tile_solid(_position:Vector2) -> bool:
-	var _tile_map:TileMapLayer = get_parent()
-	var _tile_data:TileData = _tile_map.get_cell_tile_data(_tile_map.local_to_map(_position))
-	if _tile_data.get_custom_data("is_wall") == true:
-		return true
-	return false
-
-
-func _astar_grid_setup() -> void:
-	var tile_map:TileMapLayer = get_parent()
-	var cell_size = tile_map.tile_set.tile_size
-	var tile_map_rect:Rect2i = tile_map.get_used_rect()
-	
-	astar_grid.region = tile_map_rect
-	astar_grid.cell_size = cell_size
-	astar_grid.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_NEVER
-	astar_grid.update()
-	for cell in tile_map.get_used_cells():
-		var tile_data:TileData = tile_map.get_cell_tile_data(cell)
-		if tile_data.get_custom_data('is_wall') == true:
-			astar_grid.set_point_solid(cell, true)
-
-	var our_pos:Vector2i = tile_map.local_to_map(position)
-	var player_position:Vector2i = tile_map.local_to_map(get_tree().get_first_node_in_group("Player").position)
-
-	movement_points = astar_grid.get_point_path(our_pos, player_position) 
-	if movement_points.size() > 1: global_position = movement_points[1]
-	await _movement_tween()
+func _on_took_damage(_node:Node2D) -> void:
+	if self != _node: return
+	# hurt_animation
+	pass
