@@ -25,7 +25,6 @@ func _ready() -> void:
 			if child.is_in_group(&"Player"): 
 				center_coord = starting_position
 				child.position = self.map_to_local(center_coord)
-				#child.explosion_request.connect(_on_explosion_request.bind(child))
 			virtual_tile_map[center_coord].grid_node = child
 	pass
 
@@ -41,12 +40,11 @@ func _on_move_request(_direction:Vector2i, _node:Node2D):
 	virtual_tile_map[new_center_coord] = virtual_tile_map[center_coord].duplicate()
 	virtual_tile_map[center_coord].grid_node = null
 	if _node.is_in_group("Player"):
-		#virtual_tile_map[new_center_coord].explosion_interval -= 1
 		_evaluate_explosion(new_center_coord)
 	move_response.emit(self.map_to_local(new_center_coord), _node)
 
 
-func _evaluate_explosion(_center_coord:Vector2i, _pattern:ExplosionPattern = ExplosionPattern.DIAMOND, _explosion_range:int = 7) -> void:
+func _evaluate_explosion(_center_coord:Vector2i, _pattern:ExplosionPattern = ExplosionPattern.SQUARE, _explosion_range:int = 3) -> void:
 	virtual_tile_map[_center_coord].explosion_interval -= 1
 	if virtual_tile_map[_center_coord].explosion_interval > 0: return
 	_explosion_range = _explosion_range if _explosion_range % 2 != 0 else _explosion_range + 1 # make sure it's fairly odd!
@@ -59,8 +57,8 @@ func _evaluate_explosion(_center_coord:Vector2i, _pattern:ExplosionPattern = Exp
 			if _pattern == ExplosionPattern.CROSS: if cell.x != _center_coord.x && cell.y != _center_coord.y: continue ## This will make a cross pattern
 			if _pattern == ExplosionPattern.DIAMOND: if abs(r - ((_explosion_range - 1)/2)) + abs(c - ((_explosion_range - 1)/2)) > ((_explosion_range - 1)/2): continue ## this makes a diamond pattern!
 			_instance_explosion(cell)
-			#_hurt_enemies(cell)
-	#_node.explosion_interval = 3
+			_hurt_enemies(cell)
+	virtual_tile_map[_center_coord].explosion_interval = 3
 
 
 func _hurt_enemies(cell) -> void:
