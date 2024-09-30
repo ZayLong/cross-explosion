@@ -2,7 +2,7 @@ extends Node2D
 
 signal has_moved(direction:Vector2i)
 signal move_request(_direction:Vector2i)
-@export var area_2D:Area2D
+
 var current_tile:TileData
 var tile_size:int = 64
 var is_moving:bool = false
@@ -15,20 +15,12 @@ func _ready() -> void:
 	_spawn_position()
 	add_to_group("GridNodes")
 	add_to_group("Enemies")
-	#get_tree().get_first_node_in_group("Player").has_moved.connect(_astar_grid_setup)
-
-
-#func _process(delta: float) -> void:
-	#if !area_2D: return
-	#for area in area_2D.get_overlapping_areas():
-		#if area.owner.name.contains("ExplosionNode"):
-			#queue_free()
-	
 
 
 func _spawn_position() -> void:
 	global_position = Vector2(5,5) * 64
 	pass
+
 
 func _movement_tween() -> void:
 	var _t:Tween = create_tween()

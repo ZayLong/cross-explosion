@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=4 uid="uid://bka8kw83ye3ba"]
+[gd_scene load_steps=9 format=4 uid="uid://bka8kw83ye3ba"]
 
 [ext_resource type="Texture2D" uid="uid://cvgxvjt1qmeva" path="res://autotile_template_3x3_minimal_topdown_floor.webp" id="1_srwke"]
 [ext_resource type="Script" path="res://tile_map_layer.gd" id="2_el3ll"]
@@ -366,9 +366,6 @@ custom_data_layer_1/name = "grid_node"
 custom_data_layer_1/type = 24
 sources/3 = SubResource("TileSetAtlasSource_pjxbp")
 
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_o3yyf"]
-size = Vector2(64, 64)
-
 [node name="Node2D" type="Node2D"]
 
 [node name="TileMapLayer" type="TileMapLayer" parent="."]
@@ -388,23 +385,12 @@ scale = Vector2(0.5, 0.5)
 texture = ExtResource("2_nkf42")
 metadata/_edit_lock_ = true
 
-[node name="ExplosionNode2D" parent="TileMapLayer" instance=ExtResource("3_uk2aq")]
-position = Vector2(192, 320)
-
-[node name="EnemyNode2D" type="Node2D" parent="TileMapLayer" node_paths=PackedStringArray("area_2D")]
+[node name="EnemyNode2D" type="Node2D" parent="TileMapLayer"]
 position = Vector2(384, 256)
 script = ExtResource("4_1picf")
-area_2D = NodePath("Area2D")
 
 [node name="Sprite2D" type="Sprite2D" parent="TileMapLayer/EnemyNode2D"]
 self_modulate = Color(1, 0.15, 0.15, 1)
 scale = Vector2(0.5, 0.5)
 texture = ExtResource("2_nkf42")
 centered = false
-
-[node name="Area2D" type="Area2D" parent="TileMapLayer/EnemyNode2D"]
-visible = false
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="TileMapLayer/EnemyNode2D/Area2D"]
-position = Vector2(32, 32)
-shape = SubResource("RectangleShape2D_o3yyf")
