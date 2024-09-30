@@ -18,7 +18,7 @@ func _ready() -> void:
 
 
 func _spawn_position() -> void:
-	global_position = Vector2(5,5) * 64
+	#global_position = Vector2(5,5) * 64
 	pass
 
 

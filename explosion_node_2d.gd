@@ -2,11 +2,10 @@ extends Node2D
 
 
 func _ready() -> void:
-	_movement_tween()
-	#add_to_group("GridNodes")
+	_explode_tween()
 
 
-func _movement_tween() -> void:
+func _explode_tween() -> void:
 	var _t:Tween = create_tween()
 	_t.tween_property(self.get_child(0),"scale:y",0.5,0.25).from(0.75).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BOUNCE)
 	_t.parallel()

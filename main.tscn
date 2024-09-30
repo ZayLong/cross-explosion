@@ -5,7 +5,7 @@
 [ext_resource type="Texture2D" uid="uid://gcb7u3mw3xin" path="res://icon.svg" id="2_nkf42"]
 [ext_resource type="PackedScene" uid="uid://b4j2ke2x4t4vj" path="res://explosion_node_2d.tscn" id="3_uk2aq"]
 [ext_resource type="Script" path="res://player_node.gd" id="3_up05d"]
-[ext_resource type="Script" path="res://enemy_node_2d.gd" id="4_1picf"]
+[ext_resource type="PackedScene" uid="uid://b4igm5eiyijxf" path="res://enemy_node_2d.tscn" id="6_gc3m5"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_pjxbp"]
 texture = ExtResource("1_srwke")
@@ -374,6 +374,7 @@ tile_map_data = PackedByteArray("AAARAAkAAwALAAMAAAARAAgAAwALAAIAAAARAAcAAwALAAI
 tile_set = SubResource("TileSet_6gnoj")
 script = ExtResource("2_el3ll")
 explosion_node = ExtResource("3_uk2aq")
+enemy_node = ExtResource("6_gc3m5")
 
 [node name="PlayerNode2D" type="Node2D" parent="TileMapLayer"]
 position = Vector2(64, 64)
@@ -384,13 +385,3 @@ explosion_node = ExtResource("3_uk2aq")
 scale = Vector2(0.5, 0.5)
 texture = ExtResource("2_nkf42")
 metadata/_edit_lock_ = true
-
-[node name="EnemyNode2D" type="Node2D" parent="TileMapLayer"]
-position = Vector2(384, 256)
-script = ExtResource("4_1picf")
-
-[node name="Sprite2D" type="Sprite2D" parent="TileMapLayer/EnemyNode2D"]
-self_modulate = Color(1, 0.15, 0.15, 1)
-scale = Vector2(0.5, 0.5)
-texture = ExtResource("2_nkf42")
-centered = false
