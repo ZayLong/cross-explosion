@@ -2,6 +2,7 @@ extends TileMapLayer
 
 signal move_response(_new_position:Vector2, _requester:Node2D)
 signal took_damage()
+signal eval_done
 enum ExplosionPattern {CROSS, SQUARE, DIAMOND, PATCH}
 
 @export var explosion_node:PackedScene
@@ -9,6 +10,8 @@ enum ExplosionPattern {CROSS, SQUARE, DIAMOND, PATCH}
 @export var starting_position:Vector2i = Vector2i.ONE
 
 var player:Node2D
+var lives:int = 3
+var score:int = 0
 var grid_nodes:Dictionary
 var virtual_tile_map:Dictionary
 var explosion_interval:int = 3
@@ -16,7 +19,11 @@ var astar_grid:AStarGrid2D = AStarGrid2D.new()
 var enemy_count:int = 5
 var turns:int = 0
 var is_exploding:bool = false
+var whos_turn:String = "PLAYER" ## PLAYER | ENEMY | EXPLOSION?
+var is_processing_turn:bool = false
 func _ready() -> void:
+	var my_seed:int = "Godot Rocks".hash()
+	seed(my_seed)
 	for cell in self.get_used_cells():
 		virtual_tile_map[cell] = {
 			"grid_node": null,
@@ -41,25 +48,33 @@ func _ready() -> void:
 
 ## Evaluate whether or not the requester can move and to where.
 func _on_move_request(_direction:Vector2i, _node:Node2D):
+	if is_processing_turn: return
 	var center_coord:Vector2i = self.local_to_map(_node.position)
 	var new_center_coord:Vector2i = center_coord + _direction
 	if _is_tile_valid(new_center_coord) == false: return
-	
+	is_processing_turn = true
 	virtual_tile_map[new_center_coord] = virtual_tile_map[center_coord].duplicate()
 	virtual_tile_map[center_coord].grid_node = null
 	move_response.emit(self.map_to_local(new_center_coord), _node)
-	
-	_move_enemies()
+	print("TRACE_1")
+	await _evaluate_explosion(new_center_coord)
+	print("TRACE_3")
+	await _move_enemies()
+	print("TRACE_4")
 	## Everyone has finished moving, now lets EXPLODE (maybe)
-	_evaluate_explosion(new_center_coord)
+	is_processing_turn = false
 	
 
 
-func _evaluate_explosion(_center_coord:Vector2i, _pattern:ExplosionPattern = ExplosionPattern.SQUARE, _explosion_range:int = 3) -> void:
+func _evaluate_explosion(_center_coord:Vector2i, _pattern:ExplosionPattern = ExplosionPattern.SQUARE, _explosion_range:int = 3) -> Signal:
 	is_exploding = true
 	virtual_tile_map[_center_coord].explosion_interval -= 1
-	if virtual_tile_map[_center_coord].explosion_interval > 0: return
+	if virtual_tile_map[_center_coord].explosion_interval > 0: 
+		print("RETURN EVAL")
+		is_exploding = false
+		return eval_done
 	_explosion_range = _explosion_range if _explosion_range % 2 != 0 else _explosion_range + 1 # make sure it's fairly odd!
+	
 	var offset:Vector2i = Vector2i.ONE * ( _explosion_range - 1 ) / 2
 	for r in _explosion_range if _explosion_range % 2 != 0 else _explosion_range + 1:
 		for c in _explosion_range:
@@ -67,16 +82,21 @@ func _evaluate_explosion(_center_coord:Vector2i, _pattern:ExplosionPattern = Exp
 			if _pattern == ExplosionPattern.PATCH: if (r + c) % 2 == 0: continue ## This makes a cool patchwork kind of pattern!
 			if _pattern == ExplosionPattern.CROSS: if cell.x != _center_coord.x && cell.y != _center_coord.y: continue ## This will make a cross pattern
 			if _pattern == ExplosionPattern.DIAMOND: if abs(r - ((_explosion_range - 1)/2)) + abs(c - ((_explosion_range - 1)/2)) > ((_explosion_range - 1)/2): continue ## this makes a diamond pattern!
-			_instance_explosion(cell)
-			_hurt_enemies(cell)
+			await _instance_explosion(cell)
+			await _hurt_enemies(cell)
 	virtual_tile_map[_center_coord].explosion_interval = explosion_interval
 	is_exploding = false
+	print("EVAL")
+	return eval_done
+	
 
 
 func _hurt_enemies(cell) -> void:
 	if virtual_tile_map.has(cell) == false: return
 	if virtual_tile_map[cell].grid_node == null: return
 	if virtual_tile_map[cell].grid_node.is_in_group("Enemies") == false: return
+	## await grid_node.hurt_animation
+	await get_tree().create_timer(0.1).timeout # emulate hurt animation
 	virtual_tile_map[cell].grid_node.queue_free()
 
 
@@ -85,6 +105,7 @@ func _instance_explosion(cell:Vector2i) -> void:
 	var instance = explosion_node.instantiate()
 	instance.position = map_to_local(cell)
 	add_child(instance)
+	#await instance.explode_tween(true)
 
 
 ## ENEMY MOVEMENT
@@ -98,6 +119,7 @@ func _astar_grid_setup() -> void:
 	if astar_grid.is_dirty(): astar_grid.update()
 	for cell in self.get_used_cells():
 		var tile_data:TileData = self.get_cell_tile_data(cell)
+		#if _is_tile_valid(cell) == false: astar_grid.set_point_solid(cell, true)
 		if tile_data.get_custom_data('is_wall') == true:
 			astar_grid.set_point_solid(cell, true)
 
@@ -106,8 +128,14 @@ func _astar_grid_setup() -> void:
 func _explode_enemies() -> void:
 	pass
 
-
-func _sort_by_distance(a:Node2D, b:Node2D):
+func _sort_by_real_distance(a:Node2D,b:Node2D) -> bool:
+	
+	if a.position.distance_to(player.position) < b.position.distance_to(player.position):
+		return true
+	else:
+		return false
+	
+func _sort_by_grid_distance(a:Node2D, b:Node2D) -> bool:
 	var player_tile:Vector2i = local_to_map(player.position)
 	var a_tile:Vector2i = a.position
 	var b_tile:Vector2i = b.position
@@ -122,18 +150,24 @@ func _sort_by_distance(a:Node2D, b:Node2D):
 
 
 func _move_enemies() -> void:
+	_astar_grid_setup()
+	print("MOVE")
 	var enemies:Array[Node] = get_tree().get_nodes_in_group("Enemies")
-	enemies.sort_custom(_sort_by_distance) ## enemies move in the order of closest to farthest from the player
+	enemies.sort_custom(_sort_by_real_distance) ## enemies move in the order of closest to farthest from the player
+	
 	for enemy in enemies:
 		var our_pos:Vector2i = self.local_to_map(enemy.position)
 		var player_position:Vector2i = self.local_to_map(player.position)
 		var movement_points = astar_grid.get_point_path(our_pos, player_position)
+		if movement_points.size() < 2: return
 		var new_center_coord:Vector2i = local_to_map(movement_points[1])
-
+		
 		if _is_tile_valid(new_center_coord) == false: return
 		if movement_points.size() > 1: enemy.global_position = movement_points[1]
 		virtual_tile_map[new_center_coord] = virtual_tile_map[our_pos].duplicate()
 		virtual_tile_map[our_pos].grid_node = null
+		await get_tree().create_timer(0.1).timeout
+	print("MOVE END")
 
 
 func _get_random_tile_away_from(target_pos: Vector2, min_distance:int = 8) -> Vector2:
@@ -148,8 +182,9 @@ func _get_random_tile_away_from(target_pos: Vector2, min_distance:int = 8) -> Ve
 		if _is_tile_valid(tile) == false: continue
 		valid_tiles.append(tile)
 	if valid_tiles.size() > 0:
-		var selected_tile:Vector2i = valid_tiles[randi() % valid_tiles.size()]
-		
+		var index:int = randi() % valid_tiles.size()
+		var selected_tile:Vector2i = valid_tiles[index]
+		valid_tiles.pop_at(index)
 		return selected_tile
 	else:
 		return -Vector2i.ONE

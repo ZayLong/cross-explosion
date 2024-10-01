@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=4 uid="uid://bka8kw83ye3ba"]
+[gd_scene load_steps=11 format=4 uid="uid://bka8kw83ye3ba"]
 
 [ext_resource type="Texture2D" uid="uid://cvgxvjt1qmeva" path="res://autotile_template_3x3_minimal_topdown_floor.webp" id="1_srwke"]
 [ext_resource type="Script" path="res://tile_map_layer.gd" id="2_el3ll"]
@@ -366,6 +366,12 @@ custom_data_layer_1/name = "grid_node"
 custom_data_layer_1/type = 24
 sources/3 = SubResource("TileSetAtlasSource_pjxbp")
 
+[sub_resource type="LabelSettings" id="LabelSettings_n5msy"]
+font_size = 24
+
+[sub_resource type="LabelSettings" id="LabelSettings_m4h3m"]
+font_size = 24
+
 [node name="Node2D" type="Node2D"]
 
 [node name="TileMapLayer" type="TileMapLayer" parent="."]
@@ -377,6 +383,7 @@ explosion_node = ExtResource("3_uk2aq")
 enemy_node = ExtResource("6_gc3m5")
 
 [node name="PlayerNode2D" type="Node2D" parent="TileMapLayer"]
+z_index = 2
 position = Vector2(64, 64)
 script = ExtResource("3_up05d")
 explosion_node = ExtResource("3_uk2aq")
@@ -385,3 +392,57 @@ explosion_node = ExtResource("3_uk2aq")
 scale = Vector2(0.5, 0.5)
 texture = ExtResource("2_nkf42")
 metadata/_edit_lock_ = true
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="PanelContainer" type="PanelContainer" parent="CanvasLayer"]
+offset_right = 144.0
+offset_bottom = 148.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CanvasLayer/PanelContainer"]
+layout_mode = 2
+
+[node name="LivesLabel" type="Label" parent="CanvasLayer/PanelContainer/VBoxContainer"]
+layout_mode = 2
+text = "LIVES 3"
+label_settings = SubResource("LabelSettings_n5msy")
+
+[node name="ScoreLabel" type="Label" parent="CanvasLayer/PanelContainer/VBoxContainer"]
+layout_mode = 2
+text = "SCORE: 9999"
+label_settings = SubResource("LabelSettings_m4h3m")
+
+[node name="KillsLabel" type="Label" parent="CanvasLayer/PanelContainer/VBoxContainer"]
+layout_mode = 2
+text = "KILLS: 999"
+label_settings = SubResource("LabelSettings_m4h3m")
+
+[node name="Label" type="Label" parent="CanvasLayer/PanelContainer/VBoxContainer"]
+layout_mode = 2
+label_settings = SubResource("LabelSettings_m4h3m")
+
+[node name="PanelContainer2" type="PanelContainer" parent="CanvasLayer"]
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -60.5
+offset_right = 60.5
+offset_bottom = 34.0
+grow_horizontal = 2
+size_flags_horizontal = 6
+size_flags_vertical = 4
+
+[node name="Label" type="Label" parent="CanvasLayer/PanelContainer2"]
+layout_mode = 2
+text = "WAVE: 999"
+label_settings = SubResource("LabelSettings_n5msy")
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="HBoxContainer" type="HBoxContainer" parent="CanvasLayer"]
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 148.0
+grow_horizontal = 2
+size_flags_horizontal = 3
+alignment = 1
