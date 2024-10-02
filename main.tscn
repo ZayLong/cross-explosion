@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=4 uid="uid://bka8kw83ye3ba"]
+[gd_scene load_steps=15 format=4 uid="uid://bka8kw83ye3ba"]
 
 [ext_resource type="Texture2D" uid="uid://cvgxvjt1qmeva" path="res://autotile_template_3x3_minimal_topdown_floor.webp" id="1_srwke"]
 [ext_resource type="Script" path="res://tile_map_layer.gd" id="2_el3ll"]
@@ -7,6 +7,9 @@
 [ext_resource type="Script" path="res://player_node.gd" id="3_up05d"]
 [ext_resource type="PackedScene" uid="uid://b4igm5eiyijxf" path="res://enemy_node_2d.tscn" id="6_gc3m5"]
 [ext_resource type="Script" path="res://hud.gd" id="7_asw5e"]
+[ext_resource type="Script" path="res://upgrade_node_2d.gd" id="7_ybufe"]
+[ext_resource type="Script" path="res://wall_node_2d.gd" id="8_h0omc"]
+[ext_resource type="Script" path="res://hazard_node_2d.gd" id="9_mpvye"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_pjxbp"]
 texture = ExtResource("1_srwke")
@@ -394,9 +397,42 @@ scale = Vector2(0.5, 0.5)
 texture = ExtResource("2_nkf42")
 metadata/_edit_lock_ = true
 
+[node name="UpgradeNode2D" type="Node2D" parent="TileMapLayer"]
+z_index = 2
+position = Vector2(640, 192)
+script = ExtResource("7_ybufe")
+
+[node name="Sprite2D" type="Sprite2D" parent="TileMapLayer/UpgradeNode2D"]
+self_modulate = Color(0, 0.403922, 1, 1)
+scale = Vector2(0.5, 0.5)
+texture = ExtResource("2_nkf42")
+metadata/_edit_lock_ = true
+
+[node name="WallNode2D" type="Node2D" parent="TileMapLayer"]
+z_index = 2
+position = Vector2(896, 192)
+script = ExtResource("8_h0omc")
+
+[node name="Sprite2D" type="Sprite2D" parent="TileMapLayer/WallNode2D"]
+self_modulate = Color(0.994081, 0.56808, 0, 1)
+scale = Vector2(0.5, 0.5)
+texture = ExtResource("2_nkf42")
+metadata/_edit_lock_ = true
+
+[node name="HazardNode2D" type="Node2D" parent="TileMapLayer"]
+z_index = 2
+position = Vector2(896, 384)
+script = ExtResource("9_mpvye")
+
+[node name="Sprite2D" type="Sprite2D" parent="TileMapLayer/HazardNode2D"]
+self_modulate = Color(0, 0, 0, 1)
+scale = Vector2(0.5, 0.5)
+texture = ExtResource("2_nkf42")
+metadata/_edit_lock_ = true
+
 [node name="CanvasLayer" type="CanvasLayer" parent="."]
 
-[node name="PanelContainer" type="PanelContainer" parent="CanvasLayer" node_paths=PackedStringArray("tile_map", "score_label", "lives_label", "wave_label", "kill_count_label")]
+[node name="PanelContainer" type="PanelContainer" parent="CanvasLayer" node_paths=PackedStringArray("tile_map", "score_label", "lives_label", "wave_label", "kill_count_label", "upgrades_label")]
 offset_right = 144.0
 offset_bottom = 148.0
 script = ExtResource("7_asw5e")
@@ -405,6 +441,7 @@ score_label = NodePath("VBoxContainer/ScoreLabel")
 lives_label = NodePath("VBoxContainer/LivesLabel")
 wave_label = NodePath("../PanelContainer2/Label")
 kill_count_label = NodePath("VBoxContainer/KillsLabel")
+upgrades_label = NodePath("VBoxContainer/UpgradesLabel")
 metadata/_edit_lock_ = true
 
 [node name="VBoxContainer" type="VBoxContainer" parent="CanvasLayer/PanelContainer"]
@@ -425,8 +462,9 @@ layout_mode = 2
 text = "KILLS: 999"
 label_settings = SubResource("LabelSettings_m4h3m")
 
-[node name="Label" type="Label" parent="CanvasLayer/PanelContainer/VBoxContainer"]
+[node name="UpgradesLabel" type="Label" parent="CanvasLayer/PanelContainer/VBoxContainer"]
 layout_mode = 2
+text = "asdf"
 label_settings = SubResource("LabelSettings_m4h3m")
 
 [node name="PanelContainer2" type="PanelContainer" parent="CanvasLayer"]

@@ -13,8 +13,8 @@ var allowed_moves:int = 1 ## How many squares are we allowed to move towards the
 
 func _ready() -> void:
 	_spawn_position()
-	add_to_group("GridNodes")
-	add_to_group("Enemies")
+	add_to_group(&"GridNodes")
+	add_to_group(&"Enemies")
 
 
 func _spawn_position() -> void:
