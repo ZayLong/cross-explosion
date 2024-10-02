@@ -65,14 +65,14 @@ func _on_move_request(_direction:Vector2i, _node:Node2D) -> void:
 	virtual_tile_map[new_map_pos] = virtual_tile_map[map_pos].duplicate()
 	virtual_tile_map[map_pos].grid_node = null
 	move_response.emit(self.map_to_local(new_map_pos), _node)
-	#await _evaluate_explosion(new_map_pos)
+	await _evaluate_explosion(new_map_pos)
 	_move_enemies()
 	## Everyone has finished moving, now lets EXPLODE (maybe)
 	is_processing_turn = false
 	
 
 signal completed
-func _evaluate_explosion(_center_coord:Vector2i, forced:bool = false, _pattern:ExplosionPattern = ExplosionPattern.SQUARE, _explosion_range:int = 3) -> void:
+func _evaluate_explosion(_center_coord:Vector2i, forced:bool = false, _pattern:ExplosionPattern = ExplosionPattern.CROSS, _explosion_range:int = 3) -> void:
 	var has_emitted:bool = false
 	is_exploding = true
 	
@@ -182,29 +182,30 @@ func _move_enemies() -> void:
 		
 		if virtual_tile_map.has(new_map_pos) == false: continue
 		if virtual_tile_map[new_map_pos].grid_node != null:
-			print("NOT NULL")
 			if virtual_tile_map[new_map_pos].grid_node.is_in_group(&"Enemies"): 
-				print("BUT ITS ONE OF OUR BOIS")
 				continue
 		if virtual_tile_map[new_map_pos].is_wall: continue
-
-
 		if movement_points.size() > 1: enemy.global_position = movement_points[1]
 		if virtual_tile_map[new_map_pos].grid_node == player:
-			print("WE CAUGHT THE PLAYER MUHAHA >:D")
 			_hurt_player()
-			break
-		virtual_tile_map[new_map_pos] = virtual_tile_map[our_pos].duplicate()
-		virtual_tile_map[our_pos].grid_node = null
+			continue
+		if virtual_tile_map[new_map_pos].grid_node != player:
+			virtual_tile_map[new_map_pos] = virtual_tile_map[our_pos].duplicate()
+			virtual_tile_map[our_pos].grid_node = null
 		await get_tree().create_timer(0.1).timeout
 
 
 func _hurt_player() -> void:
 	lives -= 1
 	update_lives.emit(lives)
-	if lives > 0:
-		_evaluate_explosion(local_to_map(player.position), true)
+	if lives >= 0:
+		print("EMERGENCY")
+		await _evaluate_explosion(local_to_map(player.position), true)
+	else:
+		print("WE ALREADY DEAD")
 	# some hurt feedback
+
+
 
 func _get_random_tile_away_from(target_pos: Vector2, min_distance:int = 8) -> Vector2:
 	var picked_tiles:Array[Vector2i] = []
