@@ -102,7 +102,7 @@ func _evaluate_explosion(_center_coord:Vector2i, forced:bool = false, _pattern:E
 	virtual_tile_map[_center_coord].explosion_interval = explosion_interval
 	is_exploding = false
 	if has_emitted == false: await completed
-	
+
 
 
 func _hurt_enemies(cell) -> void:
@@ -177,20 +177,23 @@ func _move_enemies() -> void:
 		var our_pos:Vector2i = self.local_to_map(enemy.position)
 		var player_position:Vector2i = self.local_to_map(player.position)
 		var movement_points = astar_grid.get_point_path(our_pos, player_position)
-		if movement_points.size() < 2: 
-			return
+		if movement_points.size() < 2: continue
 		var new_map_pos:Vector2i = local_to_map(movement_points[1])
 		
-		if virtual_tile_map.has(new_map_pos) == false: return
+		if virtual_tile_map.has(new_map_pos) == false: continue
 		if virtual_tile_map[new_map_pos].grid_node != null:
-			if virtual_tile_map[new_map_pos].grid_node.is_in_group(&"Enemies"): return
-		if virtual_tile_map[new_map_pos].is_wall: return
+			print("NOT NULL")
+			if virtual_tile_map[new_map_pos].grid_node.is_in_group(&"Enemies"): 
+				print("BUT ITS ONE OF OUR BOIS")
+				continue
+		if virtual_tile_map[new_map_pos].is_wall: continue
 
 
 		if movement_points.size() > 1: enemy.global_position = movement_points[1]
 		if virtual_tile_map[new_map_pos].grid_node == player:
 			print("WE CAUGHT THE PLAYER MUHAHA >:D")
 			_hurt_player()
+			break
 		virtual_tile_map[new_map_pos] = virtual_tile_map[our_pos].duplicate()
 		virtual_tile_map[our_pos].grid_node = null
 		await get_tree().create_timer(0.1).timeout
