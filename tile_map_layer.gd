@@ -43,13 +43,13 @@ func _ready() -> void:
 	for child in get_children():
 		if child.is_in_group(&"GridNodes"):
 			child.move_request.connect(_on_move_request.bind(child))
-			var center_coord:Vector2i = self.local_to_map(child.position)
-			#if child.is_in_group(&"Enemies"): connect("took_damage")
+			var map_pos:Vector2i = self.local_to_map(child.position)
+			#if child.is_in_group(&&"Enemies"): connect("took_damage")
 			if child.is_in_group(&"Player"): 
-				center_coord = starting_position
-				child.position = self.map_to_local(center_coord)
-			virtual_tile_map[center_coord].grid_node = child
-	player = get_tree().get_first_node_in_group("Player")
+				map_pos = starting_position
+				child.position = self.map_to_local(map_pos)
+			virtual_tile_map[map_pos].grid_node = child
+	player = get_tree().get_first_node_in_group(&"Player")
 	_astar_grid_setup()
 	for n in enemy_count:
 		_spawn_enemies()
@@ -58,14 +58,14 @@ func _ready() -> void:
 ## Evaluate whether or not the requester can move and to where.
 func _on_move_request(_direction:Vector2i, _node:Node2D) -> void:
 	if is_processing_turn: return
-	var center_coord:Vector2i = self.local_to_map(_node.position)
-	var new_center_coord:Vector2i = center_coord + _direction
-	if _is_tile_valid(new_center_coord) == false: return
+	var map_pos:Vector2i = self.local_to_map(_node.position)
+	var new_map_pos:Vector2i = map_pos + _direction
+	if _is_tile_valid(new_map_pos) == false: return
 	is_processing_turn = true
-	virtual_tile_map[new_center_coord] = virtual_tile_map[center_coord].duplicate()
-	virtual_tile_map[center_coord].grid_node = null
-	move_response.emit(self.map_to_local(new_center_coord), _node)
-	await _evaluate_explosion(new_center_coord)
+	virtual_tile_map[new_map_pos] = virtual_tile_map[map_pos].duplicate()
+	virtual_tile_map[map_pos].grid_node = null
+	move_response.emit(self.map_to_local(new_map_pos), _node)
+	#await _evaluate_explosion(new_map_pos)
 	_move_enemies()
 	## Everyone has finished moving, now lets EXPLODE (maybe)
 	is_processing_turn = false
@@ -108,9 +108,9 @@ func _evaluate_explosion(_center_coord:Vector2i, forced:bool = false, _pattern:E
 func _hurt_enemies(cell) -> void:
 	if virtual_tile_map.has(cell) == false: return
 	if virtual_tile_map[cell].grid_node == null: return
-	if virtual_tile_map[cell].grid_node.is_in_group("Enemies") == false: return
+	if virtual_tile_map[cell].grid_node.is_in_group(&"Enemies") == false: return
 	## await grid_node.hurt_animation
-	virtual_tile_map[cell].grid_node.queue_free()
+	if virtual_tile_map[cell].grid_node.is_queued_for_deletion() == false: virtual_tile_map[cell].grid_node.queue_free()
 	score += 1
 	kill_count += 1
 	update_score.emit(score)
@@ -133,6 +133,9 @@ func _astar_grid_setup() -> void:
 	astar_grid.cell_size = cell_size
 	astar_grid.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_NEVER
 	if astar_grid.is_dirty(): astar_grid.update()
+
+
+func _astar_update_solids() -> void:
 	for cell in self.get_used_cells():
 		var tile_data:TileData = self.get_cell_tile_data(cell)
 		#if _is_tile_valid(cell) == false: astar_grid.set_point_solid(cell, true)
@@ -166,25 +169,39 @@ func _sort_by_grid_distance(a:Node2D, b:Node2D) -> bool:
 
 
 func _move_enemies() -> void:
-	_astar_grid_setup()
-	print("MOVE")
-	var enemies:Array[Node] = get_tree().get_nodes_in_group("Enemies")
+	_astar_update_solids()
+	var enemies:Array[Node] = get_tree().get_nodes_in_group(&"Enemies")
 	enemies.sort_custom(_sort_by_real_distance) ## enemies move in the order of closest to farthest from the player
 	
 	for enemy in enemies:
 		var our_pos:Vector2i = self.local_to_map(enemy.position)
 		var player_position:Vector2i = self.local_to_map(player.position)
 		var movement_points = astar_grid.get_point_path(our_pos, player_position)
-		if movement_points.size() < 2: return
-		var new_center_coord:Vector2i = local_to_map(movement_points[1])
+		if movement_points.size() < 2: 
+			return
+		var new_map_pos:Vector2i = local_to_map(movement_points[1])
 		
-		if _is_tile_valid(new_center_coord) == false: return
+		if virtual_tile_map.has(new_map_pos) == false: return
+		if virtual_tile_map[new_map_pos].grid_node != null:
+			if virtual_tile_map[new_map_pos].grid_node.is_in_group(&"Enemies"): return
+		if virtual_tile_map[new_map_pos].is_wall: return
+
+
 		if movement_points.size() > 1: enemy.global_position = movement_points[1]
-		virtual_tile_map[new_center_coord] = virtual_tile_map[our_pos].duplicate()
+		if virtual_tile_map[new_map_pos].grid_node == player:
+			print("WE CAUGHT THE PLAYER MUHAHA >:D")
+			_hurt_player()
+		virtual_tile_map[new_map_pos] = virtual_tile_map[our_pos].duplicate()
 		virtual_tile_map[our_pos].grid_node = null
 		await get_tree().create_timer(0.1).timeout
-	print("MOVE END")
 
+
+func _hurt_player() -> void:
+	lives -= 1
+	update_lives.emit(lives)
+	if lives > 0:
+		_evaluate_explosion(local_to_map(player.position), true)
+	# some hurt feedback
 
 func _get_random_tile_away_from(target_pos: Vector2, min_distance:int = 8) -> Vector2:
 	var picked_tiles:Array[Vector2i] = []
