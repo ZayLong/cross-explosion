@@ -2,7 +2,10 @@ extends TileMapLayer
 
 signal move_response(_new_position:Vector2, _requester:Node2D)
 signal took_damage()
-signal eval_done
+signal update_score(score:int)
+signal update_wave(wave:int)
+signal update_lives(lives:int)
+signal update_kill_count(kill_count:int)
 enum ExplosionPattern {CROSS, SQUARE, DIAMOND, PATCH}
 
 @export var explosion_node:PackedScene
@@ -12,6 +15,9 @@ enum ExplosionPattern {CROSS, SQUARE, DIAMOND, PATCH}
 var player:Node2D
 var lives:int = 3
 var score:int = 0
+var score_mod:int = 10
+var current_wave:int = 1
+var kill_count:int = 0
 var grid_nodes:Dictionary
 var virtual_tile_map:Dictionary
 var explosion_interval:int = 3
@@ -21,9 +27,12 @@ var turns:int = 0
 var is_exploding:bool = false
 var whos_turn:String = "PLAYER" ## PLAYER | ENEMY | EXPLOSION?
 var is_processing_turn:bool = false
+
+
 func _ready() -> void:
 	var my_seed:int = "Godot Rocks".hash()
 	seed(my_seed)
+
 	for cell in self.get_used_cells():
 		virtual_tile_map[cell] = {
 			"grid_node": null,
@@ -47,7 +56,7 @@ func _ready() -> void:
 
 
 ## Evaluate whether or not the requester can move and to where.
-func _on_move_request(_direction:Vector2i, _node:Node2D):
+func _on_move_request(_direction:Vector2i, _node:Node2D) -> void:
 	if is_processing_turn: return
 	var center_coord:Vector2i = self.local_to_map(_node.position)
 	var new_center_coord:Vector2i = center_coord + _direction
@@ -56,23 +65,21 @@ func _on_move_request(_direction:Vector2i, _node:Node2D):
 	virtual_tile_map[new_center_coord] = virtual_tile_map[center_coord].duplicate()
 	virtual_tile_map[center_coord].grid_node = null
 	move_response.emit(self.map_to_local(new_center_coord), _node)
-	print("TRACE_1")
 	await _evaluate_explosion(new_center_coord)
-	print("TRACE_3")
-	await _move_enemies()
-	print("TRACE_4")
+	_move_enemies()
 	## Everyone has finished moving, now lets EXPLODE (maybe)
 	is_processing_turn = false
 	
 
-
-func _evaluate_explosion(_center_coord:Vector2i, _pattern:ExplosionPattern = ExplosionPattern.SQUARE, _explosion_range:int = 3) -> Signal:
+signal completed
+func _evaluate_explosion(_center_coord:Vector2i, forced:bool = false, _pattern:ExplosionPattern = ExplosionPattern.SQUARE, _explosion_range:int = 3) -> void:
+	var has_emitted:bool = false
 	is_exploding = true
-	virtual_tile_map[_center_coord].explosion_interval -= 1
-	if virtual_tile_map[_center_coord].explosion_interval > 0: 
-		print("RETURN EVAL")
+	
+	if forced == false: virtual_tile_map[_center_coord].explosion_interval -= 1
+	if virtual_tile_map[_center_coord].explosion_interval > 0 && forced == false: 
 		is_exploding = false
-		return eval_done
+		return
 	_explosion_range = _explosion_range if _explosion_range % 2 != 0 else _explosion_range + 1 # make sure it's fairly odd!
 	
 	var offset:Vector2i = Vector2i.ONE * ( _explosion_range - 1 ) / 2
@@ -82,12 +89,19 @@ func _evaluate_explosion(_center_coord:Vector2i, _pattern:ExplosionPattern = Exp
 			if _pattern == ExplosionPattern.PATCH: if (r + c) % 2 == 0: continue ## This makes a cool patchwork kind of pattern!
 			if _pattern == ExplosionPattern.CROSS: if cell.x != _center_coord.x && cell.y != _center_coord.y: continue ## This will make a cross pattern
 			if _pattern == ExplosionPattern.DIAMOND: if abs(r - ((_explosion_range - 1)/2)) + abs(c - ((_explosion_range - 1)/2)) > ((_explosion_range - 1)/2): continue ## this makes a diamond pattern!
-			await _instance_explosion(cell)
-			await _hurt_enemies(cell)
+			_instance_explosion(cell)
+			_hurt_enemies(cell)
+		if r == _explosion_range - 1:
+			## Simulate some fancy explosion animation
+			get_tree().create_timer(0.25).timeout.connect(
+				func():
+					completed.emit()
+					has_emitted = true
+					)
+
 	virtual_tile_map[_center_coord].explosion_interval = explosion_interval
 	is_exploding = false
-	print("EVAL")
-	return eval_done
+	if has_emitted == false: await completed
 	
 
 
@@ -96,8 +110,11 @@ func _hurt_enemies(cell) -> void:
 	if virtual_tile_map[cell].grid_node == null: return
 	if virtual_tile_map[cell].grid_node.is_in_group("Enemies") == false: return
 	## await grid_node.hurt_animation
-	await get_tree().create_timer(0.1).timeout # emulate hurt animation
 	virtual_tile_map[cell].grid_node.queue_free()
+	score += 1
+	kill_count += 1
+	update_score.emit(score)
+	update_kill_count.emit(kill_count)
 
 
 func _instance_explosion(cell:Vector2i) -> void:
@@ -105,7 +122,6 @@ func _instance_explosion(cell:Vector2i) -> void:
 	var instance = explosion_node.instantiate()
 	instance.position = map_to_local(cell)
 	add_child(instance)
-	#await instance.explode_tween(true)
 
 
 ## ENEMY MOVEMENT
@@ -206,3 +222,29 @@ func _spawn_enemies() -> void:
 	add_child(i)
 	virtual_tile_map[spawn_map_position].grid_node = i
 	
+
+## Example of an arbitrary await
+
+signal _async_test_completed # Step 1: define a signal
+func _async_test() -> void:
+	var has_emitted:bool = false # Step 2: track if we have emitted before we've reached the end of the function
+	# Add logic as usual...
+	for n in 100:
+		print(n)
+		
+		## Step 3: Add condition to finish co-routine
+		if n == 99:
+			## Simulate long running process that we want to wait for...
+			get_tree().create_timer(1).timeout.connect(
+			func(): 
+				_async_test_completed.emit() ## Step 4: Call the emit
+				has_emitted = true
+			)
+			#_async_test_completed.emit()
+			#has_emitted = true
+		pass
+	print("AWAITING")
+	# We only want to await if we've reached the end of the function BEFORE our logic has finished processing.
+	if has_emitted == false: await _async_test_completed ## Step 5: at the end of the method, conditionally await the emit
+	print("PASSED")
+	pass

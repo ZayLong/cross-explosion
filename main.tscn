@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=4 uid="uid://bka8kw83ye3ba"]
+[gd_scene load_steps=12 format=4 uid="uid://bka8kw83ye3ba"]
 
 [ext_resource type="Texture2D" uid="uid://cvgxvjt1qmeva" path="res://autotile_template_3x3_minimal_topdown_floor.webp" id="1_srwke"]
 [ext_resource type="Script" path="res://tile_map_layer.gd" id="2_el3ll"]
@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" uid="uid://b4j2ke2x4t4vj" path="res://explosion_node_2d.tscn" id="3_uk2aq"]
 [ext_resource type="Script" path="res://player_node.gd" id="3_up05d"]
 [ext_resource type="PackedScene" uid="uid://b4igm5eiyijxf" path="res://enemy_node_2d.tscn" id="6_gc3m5"]
+[ext_resource type="Script" path="res://hud.gd" id="7_asw5e"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_pjxbp"]
 texture = ExtResource("1_srwke")
@@ -384,7 +385,7 @@ enemy_node = ExtResource("6_gc3m5")
 
 [node name="PlayerNode2D" type="Node2D" parent="TileMapLayer"]
 z_index = 2
-position = Vector2(64, 64)
+position = Vector2(576, 320)
 script = ExtResource("3_up05d")
 explosion_node = ExtResource("3_uk2aq")
 
@@ -395,9 +396,16 @@ metadata/_edit_lock_ = true
 
 [node name="CanvasLayer" type="CanvasLayer" parent="."]
 
-[node name="PanelContainer" type="PanelContainer" parent="CanvasLayer"]
+[node name="PanelContainer" type="PanelContainer" parent="CanvasLayer" node_paths=PackedStringArray("tile_map", "score_label", "lives_label", "wave_label", "kill_count_label")]
 offset_right = 144.0
 offset_bottom = 148.0
+script = ExtResource("7_asw5e")
+tile_map = NodePath("../../TileMapLayer")
+score_label = NodePath("VBoxContainer/ScoreLabel")
+lives_label = NodePath("VBoxContainer/LivesLabel")
+wave_label = NodePath("../PanelContainer2/Label")
+kill_count_label = NodePath("VBoxContainer/KillsLabel")
+metadata/_edit_lock_ = true
 
 [node name="VBoxContainer" type="VBoxContainer" parent="CanvasLayer/PanelContainer"]
 layout_mode = 2
@@ -431,6 +439,7 @@ offset_bottom = 34.0
 grow_horizontal = 2
 size_flags_horizontal = 6
 size_flags_vertical = 4
+metadata/_edit_lock_ = true
 
 [node name="Label" type="Label" parent="CanvasLayer/PanelContainer2"]
 layout_mode = 2
@@ -446,3 +455,4 @@ offset_bottom = 148.0
 grow_horizontal = 2
 size_flags_horizontal = 3
 alignment = 1
+metadata/_edit_lock_ = true
