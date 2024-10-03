@@ -1,7 +1,6 @@
 extends TileMapLayer
 
-signal move_response(_new_position:Vector2, _requester:Node2D)
-signal took_damage()
+
 signal update_score(score:int)
 signal update_wave(wave:int)
 signal update_lives(lives:int)
@@ -36,7 +35,7 @@ var explosion_pattern:ExplosionPattern = ExplosionPattern.CROSS
 var explosion_range:int = 3
 var explosion_interval:int = 3
 var explosion_power:int = 1
-var explosion_chain:float = 1 # probability that an enemy will blow up and cause a chain reaction
+var explosion_chain_chance:float = 0.30 # probability that an enemy will blow up and cause a chain reaction
 var score_bonus:int = 1
 var upgrade_discount:float = 1
 
@@ -45,7 +44,7 @@ var current_upgrades:Dictionary = {
 	'explosion_range': explosion_range,
 	'explosion_interval': explosion_interval,
 	'explosion_power': explosion_power,
-	'explosion_chain': explosion_chain,
+	'explosion_chain': explosion_chain_chance,
 	"score_bonus": score_bonus,
 	"upgrade_discount": upgrade_discount,
 	"steps_per_turn": steps_per_turn
@@ -61,7 +60,8 @@ func _ready() -> void:
 			"is_wall": self.get_cell_tile_data(cell).get_custom_data(&"is_wall"),
 			"is_hazardous": false,
 			"is_enemy": false,
-			"is_player": false
+			"is_player": false,
+			"local": self.map_to_local(cell)
 		}
 	for child in get_children():
 		if child.is_in_group(&"GridNodes"):
@@ -69,34 +69,29 @@ func _ready() -> void:
 			var map_pos:Vector2i = self.local_to_map(child.position)
 			if child.is_in_group(&"Walls"): virtual_tile_map[map_pos].is_wall = true
 			if child.is_in_group(&"Hazards"): virtual_tile_map[map_pos].is_hazardous = true
-			child.position = map_to_local(map_pos)
+			child.position = virtual_tile_map[map_pos].local
 			if child.is_in_group(&"Player"):
 				#virtual_tile_map[map_pos].is_player = true
-				child.move_request.connect(_on_move_request.bind(child))
+				child.request_move.connect(_on_request_move.bind(child))
 				player_map_pos = map_pos
 				#map_pos = starting_position
 				#child.position = self.map_to_local(map_pos)
 			virtual_tile_map[map_pos].grid_node = child
+		if child is EntitySpawner: 
+			child.request_spawn.connect(_on_request_spawn.bind(child))
+			child.update_virtual_tile_map.connect(update_virtual_tile_map_entry)
 	player = get_tree().get_first_node_in_group(&"Player")
 	_astar_grid_setup()
-	for n in enemy_count:
-		_spawn_enemies()
+	#for n in enemy_count:
+		#_spawn_enemies()
 
 
-
-func _get_powerup(upgrade_type) -> void:
-	
-	pass
-
-
-func _get_upgrade() -> void:
-	
-	update_upgrades.emit(current_upgrades)
-	pass
+func _on_request_spawn(entity_spawner:EntitySpawner) -> void:
+	entity_spawner.spawn(player_map_pos,get_used_cells(),virtual_tile_map)
 
 
 ## Evaluate whether or not the requester can move and to where.
-func _on_move_request(_direction:Vector2i, _node:Node2D) -> void:
+func _on_request_move(_direction:Vector2i, _node:Node2D) -> void:
 	if is_processing_turn: return
 	if _node.is_in_group(&"Player") == false: return
 	
@@ -106,21 +101,20 @@ func _on_move_request(_direction:Vector2i, _node:Node2D) -> void:
 	is_processing_turn = true
 	if virtual_tile_map[new_map_pos].is_hazardous:
 		_hurt_player()
-	virtual_tile_map[new_map_pos] = virtual_tile_map[player_map_pos].duplicate()
-	virtual_tile_map[player_map_pos].grid_node = null
+	await _node.on_move_response(virtual_tile_map[new_map_pos].local, _node)
+	move_virtual_tile_map_entry(player_map_pos, new_map_pos)
 	player_map_pos = new_map_pos
-	move_response.emit(self.map_to_local(new_map_pos), _node)
 	
 	await _evaluate_explosion(new_map_pos)
 	if steps_per_turn <= 0:
 		_move_enemies()
-		steps_per_turn = 1
+		steps_per_turn = 0
 	else:
 		steps_per_turn -= 1
 	## Everyone has finished moving, now lets EXPLODE (maybe)
 	is_processing_turn = false
 	update_upgrades.emit(current_upgrades)
-	
+
 
 signal completed
 func _evaluate_explosion(_center_coord:Vector2i, forced:bool = false, _pattern:ExplosionPattern = ExplosionPattern.CROSS, _explosion_range:int = 3) -> void:
@@ -144,7 +138,7 @@ func _evaluate_explosion(_center_coord:Vector2i, forced:bool = false, _pattern:E
 			_hurt_enemies(cell)
 		if r == _explosion_range - 1:
 			## Simulate some fancy explosion animation
-			get_tree().create_timer(0.25).timeout.connect(
+			get_tree().create_timer(0.15).timeout.connect(
 				func():
 					completed.emit()
 					has_emitted = true
@@ -162,7 +156,7 @@ func _hurt_enemies(cell:Vector2i) -> void:
 	## await grid_node.hurt_animation
 	if virtual_tile_map[cell].grid_node.is_queued_for_deletion() == false: 
 		virtual_tile_map[cell].grid_node.queue_free()
-		virtual_tile_map[cell].grid_node = null
+		clear_virtual_tile_map_entry(cell)
 		_explode_enemies(cell)
 	score += 1
 	kill_count += 1
@@ -200,8 +194,9 @@ func _astar_update_solids() -> void:
 
 ## Enemies have x change of exploding, creating a chain reaction
 func _explode_enemies(cell:Vector2i) -> void:
+	if randf() > explosion_chain_chance: return
 	await _evaluate_explosion(cell, true)
-	pass
+
 
 func _sort_by_real_distance(a:Node2D,b:Node2D) -> bool:
 	
@@ -209,7 +204,8 @@ func _sort_by_real_distance(a:Node2D,b:Node2D) -> bool:
 		return true
 	else:
 		return false
-	
+
+
 func _sort_by_grid_distance(a:Node2D, b:Node2D) -> bool:
 	var player_tile:Vector2i = self.local_to_map(player.position)
 	var a_tile:Vector2i = a.position
@@ -230,9 +226,9 @@ func _move_enemies() -> void:
 	enemies.sort_custom(_sort_by_real_distance) ## enemies move in the order of closest to farthest from the player
 	
 	for enemy in enemies:
-		var our_pos:Vector2i = self.local_to_map(enemy.position)
-		var player_position:Vector2i = self.local_to_map(player.position)
-		var movement_points = astar_grid.get_point_path(our_pos, player_position)
+		if enemy.is_queued_for_deletion():continue
+		var enemy_map_pos:Vector2i = self.local_to_map(enemy.position)
+		var movement_points = astar_grid.get_point_path(enemy_map_pos, player_map_pos)
 		if movement_points.size() < 2: continue
 		var new_map_pos:Vector2i = self.local_to_map(movement_points[1])
 		
@@ -246,20 +242,20 @@ func _move_enemies() -> void:
 		if virtual_tile_map[new_map_pos].grid_node == player:
 			_hurt_player()
 			continue
-		if virtual_tile_map[new_map_pos].is_hazardous: _hurt_enemies(our_pos)
+		if virtual_tile_map[new_map_pos].is_hazardous: _hurt_enemies(enemy_map_pos)
 		if virtual_tile_map[new_map_pos].grid_node != player:
-			virtual_tile_map[new_map_pos] = virtual_tile_map[our_pos].duplicate()
-			virtual_tile_map[our_pos].grid_node = null
-		await get_tree().create_timer(0.1).timeout
+			move_virtual_tile_map_entry(enemy_map_pos,new_map_pos)
+
+		await get_tree().create_timer(0.1).timeout	
 
 
 func _hurt_player() -> void:
 	lives -= 1
 	update_lives.emit(lives)
 	if lives >= 0:
-		await _evaluate_explosion(self.local_to_map(player.position), true)
+		await _evaluate_explosion(player_map_pos, true)
 	else:
-		print("DEAD")
+		pass
 	# some hurt feedback
 
 
@@ -298,8 +294,31 @@ func _spawn_enemies() -> void:
 	add_child(i)
 	i.position = self.map_to_local(spawn_map_position )+ Vector2(-32,-32)
 	virtual_tile_map[spawn_map_position].grid_node = i
-	
 
+
+func update_virtual_tile_map_entry(cell:Vector2i, prop:String, data:Variant) -> void:
+	if virtual_tile_map.has(cell) == false: return
+	virtual_tile_map[cell][prop] = data
+	pass
+
+
+func clear_virtual_tile_map_entry(cell:Vector2i) -> void:
+	virtual_tile_map[cell] = {
+	"grid_node": null,
+	"is_wall": self.get_cell_tile_data(cell).get_custom_data(&"is_wall"),
+	"is_hazardous": false,
+	"is_enemy": false,
+	"is_player": false,
+	"local": self.map_to_local(cell)
+		}
+	pass
+
+
+func move_virtual_tile_map_entry(from:Vector2i, to:Vector2i) -> void:
+	var to_local:Vector2 = virtual_tile_map[to].local
+	virtual_tile_map[to] = virtual_tile_map[from].duplicate()
+	virtual_tile_map[to].local = to_local
+	clear_virtual_tile_map_entry(from)
 ## Example of an arbitrary await
 
 signal _async_test_completed # Step 1: define a signal

@@ -1,4 +1,4 @@
-extends Node2D
+class_name EnemyNode extends Node2D
 
 signal has_moved(direction:Vector2i)
 signal move_request(_direction:Vector2i)

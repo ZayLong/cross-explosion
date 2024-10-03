@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=4 uid="uid://bka8kw83ye3ba"]
+[gd_scene load_steps=16 format=4 uid="uid://bka8kw83ye3ba"]
 
 [ext_resource type="Texture2D" uid="uid://cvgxvjt1qmeva" path="res://autotile_template_3x3_minimal_topdown_floor.webp" id="1_srwke"]
 [ext_resource type="Script" path="res://tile_map_layer.gd" id="2_el3ll"]
@@ -10,6 +10,7 @@
 [ext_resource type="Script" path="res://upgrade_node_2d.gd" id="7_ybufe"]
 [ext_resource type="Script" path="res://wall_node_2d.gd" id="8_h0omc"]
 [ext_resource type="Script" path="res://hazard_node_2d.gd" id="9_mpvye"]
+[ext_resource type="Script" path="res://enemy_spawner.gd" id="10_2rp63"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_pjxbp"]
 texture = ExtResource("1_srwke")
@@ -388,7 +389,7 @@ enemy_node = ExtResource("6_gc3m5")
 
 [node name="PlayerNode2D" type="Node2D" parent="TileMapLayer"]
 z_index = 2
-position = Vector2(576, 320)
+position = Vector2(768, 384)
 script = ExtResource("3_up05d")
 explosion_node = ExtResource("3_uk2aq")
 
@@ -429,6 +430,12 @@ self_modulate = Color(0, 0, 0, 1)
 scale = Vector2(0.5, 0.5)
 texture = ExtResource("2_nkf42")
 metadata/_edit_lock_ = true
+
+[node name="Node2D" type="Node2D" parent="TileMapLayer"]
+script = ExtResource("10_2rp63")
+spawn_scene = ExtResource("6_gc3m5")
+max_spawn = 7
+spawn_interval = 0.1
 
 [node name="CanvasLayer" type="CanvasLayer" parent="."]
 
