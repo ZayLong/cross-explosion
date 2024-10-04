@@ -1,7 +1,7 @@
 class_name EntitySpawner extends Node2D
 
 signal request_spawn
-signal update_virtual_tile_map(cell:Vector2i, prop:String, data:Variant)
+signal update_virtual_tile_map(cell:Vector2i, props:Array[String], data_set:Array[Variant])
 # Parameters
 @export var spawn_scene: PackedScene
 @export var max_spawn: int = 10
@@ -63,7 +63,9 @@ func spawn(player_map_position:Vector2i, used_cells:Array[Vector2i], virtual_til
 	var i:Node2D = spawn_scene.instantiate()
 	add_child(i)
 	i.position = virtual_tile_map[spawn_map_position].local + Vector2(-32,-32)
-	update_virtual_tile_map.emit(spawn_map_position, "grid_node",i)
+	var props:Array[String] = ["is_enemy", "grid_node"]
+	var data_set:Array[Variant] = [true, i]
+	update_virtual_tile_map.emit(spawn_map_position, props, data_set)
 	i.tree_exited.connect(_on_instance_freed)
 	active_instances += 1
 	instance_pool -= 1	

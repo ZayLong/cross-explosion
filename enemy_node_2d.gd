@@ -12,14 +12,8 @@ var movement_points:PackedVector2Array
 var allowed_moves:int = 1 ## How many squares are we allowed to move towards the player
 
 func _ready() -> void:
-	_spawn_position()
 	add_to_group(&"GridNodes")
 	add_to_group(&"Enemies")
-
-
-func _spawn_position() -> void:
-	#global_position = Vector2(5,5) * 64
-	pass
 
 
 func _movement_tween() -> void:

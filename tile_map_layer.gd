@@ -19,7 +19,7 @@ var score:int = 0
 var current_wave:int = 1
 var kill_count:int = 0
 var grid_nodes:Dictionary
-var virtual_tile_map:Dictionary
+var virtual_tile_map:Dictionary[Vector2i,VirtualTile]
 
 var astar_grid:AStarGrid2D = AStarGrid2D.new()
 var enemy_count:int = 5
@@ -53,37 +53,27 @@ var current_upgrades:Dictionary = {
 func _ready() -> void:
 	var my_seed:int = "Godot Rocks".hash()
 	seed(my_seed)
-
+	var x:Node2D
 	for cell in self.get_used_cells():
-		virtual_tile_map[cell] = {
-			"grid_node": null,
-			"is_wall": self.get_cell_tile_data(cell).get_custom_data(&"is_wall"),
-			"is_hazardous": false,
-			"is_enemy": false,
-			"is_player": false,
-			"local": self.map_to_local(cell)
-		}
+		var virtual_tilemap:VirtualTile = VirtualTile.new(x, self.map_to_local(cell), self.get_cell_tile_data(cell).get_custom_data(&"is_wall"), false, false, false)
+		virtual_tile_map[cell] = virtual_tilemap
 	for child in get_children():
 		if child.is_in_group(&"GridNodes"):
-			
 			var map_pos:Vector2i = self.local_to_map(child.position)
-			if child.is_in_group(&"Walls"): virtual_tile_map[map_pos].is_wall = true
-			if child.is_in_group(&"Hazards"): virtual_tile_map[map_pos].is_hazardous = true
 			child.position = virtual_tile_map[map_pos].local
+			virtual_tile_map[map_pos].grid_node = child
+			if child.is_in_group(&"Walls"): virtual_tile_map[map_pos].is_wall = true
+			if child.is_in_group(&"Hazards"): virtual_tile_map[map_pos].is_hazard = true
+			if child.is_in_group(&"Enemies"): virtual_tile_map[map_pos].is_enemy = true
 			if child.is_in_group(&"Player"):
-				#virtual_tile_map[map_pos].is_player = true
+				virtual_tile_map[map_pos].is_player = true
 				child.request_move.connect(_on_request_move.bind(child))
 				player_map_pos = map_pos
-				#map_pos = starting_position
-				#child.position = self.map_to_local(map_pos)
-			virtual_tile_map[map_pos].grid_node = child
 		if child is EntitySpawner: 
 			child.request_spawn.connect(_on_request_spawn.bind(child))
 			child.update_virtual_tile_map.connect(update_virtual_tile_map_entry)
 	player = get_tree().get_first_node_in_group(&"Player")
 	_astar_grid_setup()
-	#for n in enemy_count:
-		#_spawn_enemies()
 
 
 func _on_request_spawn(entity_spawner:EntitySpawner) -> void:
@@ -99,16 +89,19 @@ func _on_request_move(_direction:Vector2i, _node:Node2D) -> void:
 	if virtual_tile_map.has(new_map_pos) == false: return
 	if virtual_tile_map[new_map_pos].is_wall: return
 	is_processing_turn = true
-	if virtual_tile_map[new_map_pos].is_hazardous:
-		_hurt_player()
+	
 	await _node.on_move_response(virtual_tile_map[new_map_pos].local, _node)
+	if virtual_tile_map[new_map_pos].is_hazard || virtual_tile_map[new_map_pos].is_enemy:
+		player_map_pos = new_map_pos
+		await _hurt_player()
+		await get_tree().create_timer(0.5).timeout
 	move_virtual_tile_map_entry(player_map_pos, new_map_pos)
 	player_map_pos = new_map_pos
-	
 	await _evaluate_explosion(new_map_pos)
+	
 	if steps_per_turn <= 0:
 		_move_enemies()
-		steps_per_turn = 0
+		steps_per_turn = 2
 	else:
 		steps_per_turn -= 1
 	## Everyone has finished moving, now lets EXPLODE (maybe)
@@ -134,9 +127,11 @@ func _evaluate_explosion(_center_coord:Vector2i, forced:bool = false, _pattern:E
 			if _pattern == ExplosionPattern.PATCH: if (r + c) % 2 == 0: continue ## This makes a cool patchwork kind of pattern!
 			if _pattern == ExplosionPattern.CROSS: if cell.x != _center_coord.x && cell.y != _center_coord.y: continue ## This will make a cross pattern
 			if _pattern == ExplosionPattern.DIAMOND: if abs(r - ((_explosion_range - 1)/2)) + abs(c - ((_explosion_range - 1)/2)) > ((_explosion_range - 1)/2): continue ## this makes a diamond pattern!
-			_instance_explosion(cell)
-			_hurt_enemies(cell)
+			await _instance_explosion(cell)
+			await _hurt_enemies(cell)
 		if r == _explosion_range - 1:
+			await _instance_explosion(_center_coord)
+			await _hurt_enemies(_center_coord)
 			## Simulate some fancy explosion animation
 			get_tree().create_timer(0.15).timeout.connect(
 				func():
@@ -152,12 +147,12 @@ func _evaluate_explosion(_center_coord:Vector2i, forced:bool = false, _pattern:E
 func _hurt_enemies(cell:Vector2i) -> void:
 	if virtual_tile_map.has(cell) == false: return
 	if virtual_tile_map[cell].grid_node == null: return
-	if virtual_tile_map[cell].grid_node.is_in_group(&"Enemies") == false: return
+	if virtual_tile_map[cell].is_enemy == false: return
 	## await grid_node.hurt_animation
 	if virtual_tile_map[cell].grid_node.is_queued_for_deletion() == false: 
 		virtual_tile_map[cell].grid_node.queue_free()
 		clear_virtual_tile_map_entry(cell)
-		_explode_enemies(cell)
+		await _explode_enemies(cell)
 	score += 1
 	kill_count += 1
 	update_score.emit(score)
@@ -185,11 +180,10 @@ func _astar_grid_setup() -> void:
 func _astar_update_solids() -> void:
 	for cell in self.get_used_cells():
 		var tile_data:TileData = self.get_cell_tile_data(cell)
-		#if _is_tile_valid(cell) == false: astar_grid.set_point_solid(cell, true)
 		if tile_data.get_custom_data('is_wall') == true: astar_grid.set_point_solid(cell, true)
 		if virtual_tile_map.has(cell):
 			if virtual_tile_map[cell].grid_node != null:
-				if virtual_tile_map[cell].grid_node.is_in_group(&"Walls"): astar_grid.set_point_solid(cell, true)
+				if virtual_tile_map[cell].is_wall: astar_grid.set_point_solid(cell, true)
 
 
 ## Enemies have x change of exploding, creating a chain reaction
@@ -226,7 +220,7 @@ func _move_enemies() -> void:
 	enemies.sort_custom(_sort_by_real_distance) ## enemies move in the order of closest to farthest from the player
 	
 	for enemy in enemies:
-		if enemy.is_queued_for_deletion():continue
+		if enemy == null:continue
 		var enemy_map_pos:Vector2i = self.local_to_map(enemy.position)
 		var movement_points = astar_grid.get_point_path(enemy_map_pos, player_map_pos)
 		if movement_points.size() < 2: continue
@@ -234,16 +228,14 @@ func _move_enemies() -> void:
 		
 		if virtual_tile_map.has(new_map_pos) == false: continue
 		if virtual_tile_map[new_map_pos].grid_node != null:
-			if virtual_tile_map[new_map_pos].grid_node.is_in_group(&"Enemies"): 
-				continue
-		if virtual_tile_map[new_map_pos].is_wall: continue
-		if movement_points.size() > 1: 
-			enemy.global_position = movement_points[1]
-		if virtual_tile_map[new_map_pos].grid_node == player:
-			_hurt_player()
+			if virtual_tile_map[new_map_pos].is_enemy: continue
+			if virtual_tile_map[new_map_pos].is_wall: continue
+		if movement_points.size() > 1: enemy.global_position = movement_points[1]
+		if virtual_tile_map[new_map_pos].is_player:
+			await _hurt_player()
 			continue
-		if virtual_tile_map[new_map_pos].is_hazardous: _hurt_enemies(enemy_map_pos)
-		if virtual_tile_map[new_map_pos].grid_node != player:
+		if virtual_tile_map[new_map_pos].is_hazard: _hurt_enemies(enemy_map_pos)
+		if virtual_tile_map[new_map_pos].is_player == false:
 			move_virtual_tile_map_entry(enemy_map_pos,new_map_pos)
 
 		await get_tree().create_timer(0.1).timeout	
@@ -259,88 +251,44 @@ func _hurt_player() -> void:
 	# some hurt feedback
 
 
-func _get_random_tile_away_from(target_pos: Vector2, min_distance:int = 8) -> Vector2:
-	var picked_tiles:Array[Vector2i] = []
-	var valid_tiles:Array[Vector2i] = []
-	for cell in self.get_used_cells():
-		if abs(cell.x - target_pos.x) + abs(cell.y - target_pos.y) >= min_distance:
-			picked_tiles.append(cell)
-
-	# Select a random tile from the valid tiles
-	for tile in picked_tiles:
-		if _is_tile_valid(tile) == false: continue
-		valid_tiles.append(tile)
-	if valid_tiles.size() > 0:
-		var index:int = randi() % valid_tiles.size()
-		var selected_tile:Vector2i = valid_tiles[index]
-		valid_tiles.pop_at(index)
-		return selected_tile
-	else:
-		return -Vector2i.ONE
-
-
-func _is_tile_valid(coord:Vector2i) -> bool:
-	if virtual_tile_map.has(coord) == false: return false
-	if virtual_tile_map[coord].grid_node != null: return false
-	if virtual_tile_map[coord].is_wall: return false
-	return true
-
-
-func _spawn_enemies() -> void:
-	if enemy_node.can_instantiate() == false: return
-	var player_map_position:Vector2i = self.local_to_map(player.position)
-	var spawn_map_position:Vector2i = _get_random_tile_away_from(player_map_position)
-	var i:Node2D = enemy_node.instantiate()
-	add_child(i)
-	i.position = self.map_to_local(spawn_map_position )+ Vector2(-32,-32)
-	virtual_tile_map[spawn_map_position].grid_node = i
-
-
-func update_virtual_tile_map_entry(cell:Vector2i, prop:String, data:Variant) -> void:
+func update_virtual_tile_map_entry(cell:Vector2i, props:Array[String], data_set:Array[Variant]) -> void:
 	if virtual_tile_map.has(cell) == false: return
-	virtual_tile_map[cell][prop] = data
+
+	if props.size() != data_set.size(): push_warning("update virtual_tilemap: props and data_set are different sizes.")
+	var iterate:int = 0
+	for prop in props:
+		virtual_tile_map[cell][prop] = data_set[iterate]
+		iterate += 1
+	#virtual_tile_map[cell][prop] = data
 	pass
 
 
 func clear_virtual_tile_map_entry(cell:Vector2i) -> void:
-	virtual_tile_map[cell] = {
-	"grid_node": null,
-	"is_wall": self.get_cell_tile_data(cell).get_custom_data(&"is_wall"),
-	"is_hazardous": false,
-	"is_enemy": false,
-	"is_player": false,
-	"local": self.map_to_local(cell)
-		}
+	var local:Vector2 = virtual_tile_map[cell].local
+	virtual_tile_map[cell] = VirtualTile.new()
+	virtual_tile_map[cell].local = local
 	pass
 
 
 func move_virtual_tile_map_entry(from:Vector2i, to:Vector2i) -> void:
-	var to_local:Vector2 = virtual_tile_map[to].local
-	virtual_tile_map[to] = virtual_tile_map[from].duplicate()
-	virtual_tile_map[to].local = to_local
+	for prop in virtual_tile_map[from].get_property_list():
+		if prop.name != "local":
+			virtual_tile_map[to].set(prop.name,virtual_tile_map[from].get(prop.name))
 	clear_virtual_tile_map_entry(from)
-## Example of an arbitrary await
 
-signal _async_test_completed # Step 1: define a signal
-func _async_test() -> void:
-	var has_emitted:bool = false # Step 2: track if we have emitted before we've reached the end of the function
-	# Add logic as usual...
-	for n in 100:
-		print(n)
-		
-		## Step 3: Add condition to finish co-routine
-		if n == 99:
-			## Simulate long running process that we want to wait for...
-			get_tree().create_timer(1).timeout.connect(
-			func(): 
-				_async_test_completed.emit() ## Step 4: Call the emit
-				has_emitted = true
-			)
-			#_async_test_completed.emit()
-			#has_emitted = true
+
+class VirtualTile:
+	var grid_node:Node2D
+	var local:Vector2
+	var is_wall:bool
+	var is_hazard:bool
+	var is_enemy:bool
+	var is_player:bool
+	func _init(_grid_node:Node2D = null, _local:Vector2 = Vector2(0,0), _is_wall:bool = false, _is_hazard:bool = false, _is_enemy:bool = false, _is_player:bool = false):
+		grid_node = _grid_node
+		local = _local
+		is_wall = _is_wall
+		is_hazard = _is_hazard
+		is_enemy = _is_enemy
+		is_player = _is_player
 		pass
-	print("AWAITING")
-	# We only want to await if we've reached the end of the function BEFORE our logic has finished processing.
-	if has_emitted == false: await _async_test_completed ## Step 5: at the end of the method, conditionally await the emit
-	print("PASSED")
-	pass

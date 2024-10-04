@@ -26,7 +26,6 @@ func on_move_response(_new_position:Vector2, _requester:Node2D) -> void:
 	if _new_position == position: 
 		is_moving = false
 		return
-	print(_new_position)
 	position = _new_position
 	await _movement_tween()
 
