@@ -1,7 +1,7 @@
 class_name PlayerNode extends Node2D
 
 signal request_move(_direction:Vector2i)
-signal explosion_request()
+#signal explosion_request()
 
 @export var explosion_node:PackedScene
 
@@ -13,10 +13,9 @@ func _ready() -> void:
 	add_to_group(&"GridNodes")
 
 
-func _unhandled_key_input(event: InputEvent) -> void:
-	var x_axis:int = Input.get_axis("ui_left", "ui_right")
-	var y_axis:int = Input.get_axis("ui_up", "ui_down")
-	if is_moving == true: false
+func _unhandled_key_input(_event: InputEvent) -> void:
+	var x_axis:int = Input.get_axis("ui_left", "ui_right") as int
+	var y_axis:int = Input.get_axis("ui_up", "ui_down") as int
 	if Vector2i(x_axis, y_axis) == Vector2i.ZERO: return
 	request_move.emit(Vector2i(x_axis,y_axis))
 

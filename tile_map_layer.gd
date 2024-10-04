@@ -2,7 +2,7 @@ extends TileMapLayer
 
 
 signal update_score(score:int)
-signal update_wave(wave:int)
+#signal update_wave(wave:int)
 signal update_lives(lives:int)
 signal update_kill_count(kill_count:int)
 signal update_upgrades(upgrade_info:Dictionary)
@@ -53,9 +53,8 @@ var current_upgrades:Dictionary = {
 func _ready() -> void:
 	var my_seed:int = "Godot Rocks".hash()
 	seed(my_seed)
-	var x:Node2D
 	for cell in self.get_used_cells():
-		var virtual_tilemap:VirtualTile = VirtualTile.new(x, self.map_to_local(cell), self.get_cell_tile_data(cell).get_custom_data(&"is_wall"), false, false, false)
+		var virtual_tilemap:VirtualTile = VirtualTile.new(null, self.map_to_local(cell), self.get_cell_tile_data(cell).get_custom_data(&"is_wall"), false, false, false)
 		virtual_tile_map[cell] = virtual_tilemap
 	for child in get_children():
 		if child.is_in_group(&"GridNodes"):
@@ -101,7 +100,7 @@ func _on_request_move(_direction:Vector2i, _node:Node2D) -> void:
 	
 	if steps_per_turn <= 0:
 		_move_enemies()
-		steps_per_turn = 2
+		steps_per_turn = 1
 	else:
 		steps_per_turn -= 1
 	## Everyone has finished moving, now lets EXPLODE (maybe)
@@ -126,18 +125,17 @@ func _evaluate_explosion(_center_coord:Vector2i, forced:bool = false, _pattern:E
 			var cell:Vector2i = (_center_coord - Vector2i(r,c)) + offset
 			if _pattern == ExplosionPattern.PATCH: if (r + c) % 2 == 0: continue ## This makes a cool patchwork kind of pattern!
 			if _pattern == ExplosionPattern.CROSS: if cell.x != _center_coord.x && cell.y != _center_coord.y: continue ## This will make a cross pattern
-			if _pattern == ExplosionPattern.DIAMOND: if abs(r - ((_explosion_range - 1)/2)) + abs(c - ((_explosion_range - 1)/2)) > ((_explosion_range - 1)/2): continue ## this makes a diamond pattern!
-			await _instance_explosion(cell)
+			if _pattern == ExplosionPattern.DIAMOND: if abs(r - ((_explosion_range as float - 1)/2)) + abs(c - ((_explosion_range as float - 1)/2)) > ((_explosion_range as float - 1)/2): continue ## this makes a diamond pattern!
+			_instance_explosion(cell)
 			await _hurt_enemies(cell)
 		if r == _explosion_range - 1:
-			await _instance_explosion(_center_coord)
+			_instance_explosion(_center_coord)
 			await _hurt_enemies(_center_coord)
 			## Simulate some fancy explosion animation
-			get_tree().create_timer(0.15).timeout.connect(
-				func():
-					completed.emit()
-					has_emitted = true
-					)
+			await get_tree().create_timer(0.15).timeout
+			completed.emit()
+			has_emitted = true
+
 
 	explosion_interval = current_upgrades.explosion_interval
 	is_exploding = false
@@ -162,7 +160,7 @@ func _hurt_enemies(cell:Vector2i) -> void:
 func _instance_explosion(cell:Vector2i) -> void:
 	if explosion_node == null || explosion_node.can_instantiate() == false: return
 	var instance = explosion_node.instantiate()
-	instance.position = self.map_to_local(cell)
+	instance.position = virtual_tile_map[cell].local
 	self.add_child(instance)
 
 
