@@ -2,10 +2,11 @@ extends TileMapLayer
 
 
 signal update_score(score:int)
-#signal update_wave(wave:int)
+signal update_wave(wave:int)
 signal update_lives(lives:int)
 signal update_kill_count(kill_count:int)
 signal update_upgrades(upgrade_info:Dictionary)
+
 enum ExplosionPattern {CROSS, SQUARE, DIAMOND, PATCH}
 
 @export var explosion_node:PackedScene

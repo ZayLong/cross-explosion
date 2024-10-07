@@ -1,7 +1,7 @@
 class_name PlayerNode extends Node2D
 
 signal request_move(_direction:Vector2i)
-#signal explosion_request()
+signal explosion_request()
 
 @export var explosion_node:PackedScene
 
